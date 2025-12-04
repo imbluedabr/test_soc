@@ -96,7 +96,8 @@ architecture main_arch of main is
             data_in : in std_logic_vector(7 downto 0);
             data_out : out std_logic_vector(7 downto 0);
             adres_out : out std_logic_vector(7 downto 0);
-            rw_select : out std_logic;
+            read_enable : out std_logic;
+            write_enable : out std_logic;
             reset : in std_logic;
             clock : in std_logic;
             chip_select : in std_logic;
@@ -111,7 +112,8 @@ architecture main_arch of main is
             data_in : in std_logic_vector(7 downto 0);
             data_out : out std_logic_vector(7 downto 0);
             adres_in : in std_logic_vector(7 downto 0);
-            rw_select : in std_logic;
+            read_enable : in std_logic;
+            write_enable : in std_logic;
             chip_select : in std_logic;
             clock : in std_logic
         );
@@ -123,12 +125,14 @@ architecture main_arch of main is
     signal sys_data_in : std_logic_vector(7 downto 0);
     signal sys_adres_in : std_logic_vector(7 downto 0);
     signal sys_data_out : std_logic_vector(7 downto 0);
-    signal sys_rw_select : std_logic;
+    signal sys_read_enable : std_logic;
+    signal sys_write_enable : std_logic;
 
     signal cpu0_data_in : std_logic_vector(7 downto 0);
     signal cpu0_data_out : std_logic_vector(7 downto 0);
     signal cpu0_adres_out : std_logic_vector(7 downto 0);
-    signal cpu0_rw_select : std_logic;
+    signal cpu0_read_enable : std_logic;
+    signal cpu0_write_enable : std_logic;
     signal cpu0_chip_select : std_logic;
     signal cpu0_ir : unsigned(4 downto 0);
     signal cpu0_ic : unsigned(2 downto 0);
@@ -136,7 +140,8 @@ architecture main_arch of main is
     signal programmer_data_in : std_logic_vector(7 downto 0);
     signal programmer_data_out : std_logic_vector(7 downto 0);
     signal programmer_adres_out : std_logic_vector(7 downto 0);
-    signal programmer_rw_select : std_logic;
+    signal programmer_read_enable : std_logic;
+    signal programmer_write_enable : std_logic;
     signal programmer_enable : std_logic;
 
     signal mem0_data_out : std_logic_vector(7 downto 0);
@@ -153,8 +158,11 @@ begin
     --slave input mux
     sys_adres_in <= cpu0_adres_out when cpu0_chip_select = '1' else
                     programmer_adres_out;
-    sys_rw_select <= cpu0_rw_select when cpu0_chip_select = '1' else
-                    programmer_rw_select;
+    sys_read_enable <= cpu0_read_enable when cpu0_chip_select = '1' else
+                    programmer_read_enable;
+    sys_write_enable <= cpu0_write_enable when cpu0_chip_select = '1' else
+                    programmer_write_enable;
+
     --master input mux
     programmer_data_in <= sys_data_out when programmer_enable = '1' else (others => '0');
     cpu0_data_in <= sys_data_out when cpu0_chip_select = '1' else (others => '0');
@@ -175,23 +183,25 @@ begin
             end if;
             
             if (KEY(1) = '0') then --keys use active low logic(pull up resistors)
-                programmer_rw_select <= '1';
+                programmer_write_enable <= '1';
+                programmer_read_enable <= '0';
             else
-                programmer_rw_select <= '0';
+                programmer_read_enable <= '1';
+                programmer_write_enable <= '0';
             end if;
         end if;
     end process;
 
-    cpu0: test_cpu port map ( data_in => cpu0_data_in, data_out => cpu0_data_out, adres_out => cpu0_adres_out, rw_select => cpu0_rw_select, reset => sys_reset, clock => sys_clk, chip_select => cpu0_chip_select, reg_ir => cpu0_ir, reg_ic => cpu0_ic );
+    cpu0: test_cpu port map ( data_in => cpu0_data_in, data_out => cpu0_data_out, adres_out => cpu0_adres_out, read_enable => cpu0_read_enable, write_enable => cpu0_write_enable, reset => sys_reset, clock => sys_clk, chip_select => cpu0_chip_select, reg_ir => cpu0_ir, reg_ic => cpu0_ic );
 
     --chip select logic for memory, maps ram from 0 to 127
     mem0_chip_select <= '1' when sys_adres_in(7) = '0' else '0';
-    mem0: test_ram port map ( data_in => sys_data_in, data_out => mem0_data_out, adres_in => sys_adres_in, rw_select => sys_rw_select, clock => sys_clk, chip_select => mem0_chip_select);
+    mem0: test_ram port map ( data_in => sys_data_in, data_out => mem0_data_out, adres_in => sys_adres_in, read_enable => sys_read_enable, write_enable => sys_write_enable, clock => sys_clk, chip_select => mem0_chip_select);
 
     
 
     LEDR(9) <= sys_clk;
-    LEDR(8) <= sys_rw_select;
+    LEDR(8) <= sys_read_enable;
     LEDR(7 downto 0) <= sys_adres_in;
 
     display0: led7seg_decoder port map ( input => std_logic_vector(cpu0_ir(3 downto 0)), segments => HEX0);
