@@ -9,7 +9,8 @@ entity test_ram is
         data_in : in std_logic_vector(7 downto 0);
         data_out : out std_logic_vector(7 downto 0);
         adres_in : in std_logic_vector(7 downto 0);
-        rw_select : in std_logic;
+        read_enable : in std_logic;
+        write_enable : in std_logic;
         chip_select : in std_logic;
         clock : in std_logic
     );
@@ -28,9 +29,11 @@ begin
     begin
         if rising_edge(clock) then
             if (chip_select = '1') then
-                if (rw_select = '1') then
+                if (write_enable = '1') then
                     ram(to_integer(unsigned(adres_in))) <= data_in;
-                else
+                end if;
+
+                if (read_enable = '1') then
                     data_out <= ram(to_integer(unsigned(adres_in)));
                 end if;
             end if;
@@ -50,11 +53,12 @@ entity test_cpu is
         data_in : in std_logic_vector(7 downto 0);
         data_out : out std_logic_vector(7 downto 0);
         adres_out : out std_logic_vector(7 downto 0);
-        rw_select : out std_logic;
+        read_enable : out std_logic;
+        write_enable : out std_logic;
         reset : in std_logic;
         clock : in std_logic;
         chip_select : in std_logic;
-        reg_ir : inout unsigned(4 downto 0);
+        reg_ir : inout unsigned(4 downto 0); --debug outputs
         reg_ic : inout unsigned(2 downto 0)
     );
 
@@ -64,11 +68,13 @@ end entity test_cpu;
 architecture test_cpu_arch of test_cpu is
 
     signal reg_ip : unsigned(7 downto 0);
-
+    
     signal reg_mar : unsigned(7 downto 0);
 
     signal reg_a : unsigned(7 downto 0);
     signal reg_b : unsigned(7 downto 0);
+
+    signal internal_bus : unsigned(7 downto 0);
 
     type microcode_rom_type is array (0 to 31) of std_logic_vector(7 downto 0);
     
@@ -80,8 +86,6 @@ architecture test_cpu_arch of test_cpu is
         others => (others => '0')
     );
 
-    signal control_signals : std_logic_vector(7 downto 0);
-    
 begin
 
     cycle: process (clock, reset, chip_select)
@@ -92,9 +96,11 @@ begin
             reg_ic <= (others => '0');
         elsif rising_edge(clock) then --this doesnt run if enable is low 
             if (chip_select = '1') then
-                adres_out <= std_logic_vector(reg_ip);
-                control_signals <= microcode_rom(to_integer((reg_ir sll 3) or reg_ic));                 
-                reg_ic <= reg_ic + 1;
+                
+                control_signals <= microcode_rom(to_integer((reg_ir sll 3) or reg_ic));
+                reg_ic <= reg_ic + 1; --increment the microinstruction counter
+
+
             end if;
         end if;
     end process;
