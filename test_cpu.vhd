@@ -74,21 +74,21 @@ architecture test_cpu_arch of test_cpu is
     signal reg_a : unsigned(7 downto 0);
     signal reg_b : unsigned(7 downto 0);
 
-    signal internal_bus : unsigned(7 downto 0);
-
     type microcode_rom_type is array (0 to 31) of std_logic_vector(7 downto 0);
     
     constant microcode_rom : microcode_rom_type := (
         --0x00 NOP
-        0  => "11000100", --set adres_out, select ip, inc ip
+        0  => "00110010", --ld adres, inc ip, select reg_ip
         1  => "00000000",
-        2  => "00001000",
+        2  => "00001001", --ld ir, select data_in
         others => (others => '0')
     );
 
 begin
 
     cycle: process (clock, reset, chip_select)
+        variable control_signals : std_logic_vector(7 downto 0) := (others => '0');
+        variable internal_bus : unsigned(7 downto 0) := (others => '0');
     begin
         if (reset = '0') then
             reg_ip <= (others => '0');
@@ -100,6 +100,35 @@ begin
                 control_signals <= microcode_rom(to_integer((reg_ir sll 3) or reg_ic));
                 reg_ic <= reg_ic + 1; --increment the microinstruction counter
 
+                case control_signals(2 downto 0) is
+                    when "001" => internal_bus <= unsigned(data_in);
+                    when "010" => internal_bus <= reg_ip;
+                    when "011" => internal_bus <= reg_mar;
+                    when "100" => internal_bus <= reg_a;
+                    when "101" => internal_bus <= reg_b;
+                    when others => internal_bus <= (others => '0');
+                end case;
+
+                if (control_signals(3) = '1') then --ld ir : loads a new instruction from the internal_bus
+                    reg_ir <= internal_bus;
+                    reg_ic <= (others => '0');
+                end if;
+
+                if (control_signals(4) = '1') then --ld adres : sets the adres_out to the internal_bus
+                    adres_out <= std_logic_vector(internal_bus);
+                else
+                    adres_out <= (others => '0');
+                end if;
+
+                if (control_signals(5) = '1') then --inc ip : increments the instruction pointer
+                    reg_ip <= reg_ip + 1;
+                end if;
+
+                if (control_signals(6) = '1') then --rd : enable read enable
+                    read_enable <= '1';
+                else
+                    read_enable <= '0';
+                end if;
 
             end if;
         end if;
