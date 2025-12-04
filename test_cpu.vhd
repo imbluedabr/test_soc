@@ -97,16 +97,17 @@ begin
         elsif rising_edge(clock) then --this doesnt run if enable is low 
             if (chip_select = '1') then
                 
-                control_signals <= microcode_rom(to_integer((reg_ir sll 3) or reg_ic));
+                control_signals := microcode_rom(to_integer((reg_ir sll 3) or reg_ic));
                 reg_ic <= reg_ic + 1; --increment the microinstruction counter
 
+                --this is horrible
                 case control_signals(2 downto 0) is
-                    when "001" => internal_bus <= unsigned(data_in);
-                    when "010" => internal_bus <= reg_ip;
-                    when "011" => internal_bus <= reg_mar;
-                    when "100" => internal_bus <= reg_a;
-                    when "101" => internal_bus <= reg_b;
-                    when others => internal_bus <= (others => '0');
+                    when "001" => internal_bus := unsigned(data_in);
+                    when "010" => internal_bus := reg_ip;
+                    when "011" => internal_bus := reg_mar;
+                    when "100" => internal_bus := reg_a;
+                    when "101" => internal_bus := reg_b;
+                    when others => internal_bus := (others => '0');
                 end case;
 
                 if (control_signals(3) = '1') then --ld ir : loads a new instruction from the internal_bus
