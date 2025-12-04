@@ -111,7 +111,7 @@ begin
                 end case;
 
                 if (control_signals(3) = '1') then --ld ir : loads a new instruction from the internal_bus
-                    reg_ir <= internal_bus;
+                    reg_ir <= internal_bus(4 downto 0);
                     reg_ic <= (others => '0');
                 end if;
 
