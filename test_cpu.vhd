@@ -78,7 +78,7 @@ architecture test_cpu_arch of test_cpu is
     
     constant microcode_rom : microcode_rom_type := (
         --0x00 NOP
-        0  => "00110010", --ld adres, inc ip, select reg_ip
+        0  => "01110010", --ld adres, inc ip, select reg_ip, rd
         1  => "00000000",
         2  => "00001001", --ld ir, select data_in
         others => (others => '0')
