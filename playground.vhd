@@ -147,6 +147,12 @@ architecture main_arch of main is
     signal mem0_data_out : std_logic_vector(7 downto 0);
     signal mem0_chip_select : std_logic;
 
+    signal io0_data_register : std_logic_vector(7 downto 0);
+    signal io0_chip_select : std_logic;
+
+    signal display2_mux : std_logic_vector(3 downto 0);
+    signal display3_mux : std_logic_vector(3 downto 0);
+
 begin
 
 
@@ -192,6 +198,18 @@ begin
         end if;
     end process;
 
+    io0_chip_select <= '1' when sys_adres_in = "0000001" else '0';
+    io0: process (sys_clk)
+    begin
+        if rising_edge(sys_clk) then
+            if (io0_chip_select = '1') then
+                if (sys_write_enable = '1') then
+                    io0_data_register <= sys_data_in;
+                end if;
+            end if;
+        end if;
+    end process
+
     cpu0: test_cpu port map ( data_in => cpu0_data_in, data_out => cpu0_data_out, adres_out => cpu0_adres_out, read_enable => cpu0_read_enable, write_enable => cpu0_write_enable, reset => sys_reset, clock => sys_clk, chip_select => cpu0_chip_select, reg_ir => cpu0_ir, reg_ic => cpu0_ic );
 
     --chip select logic for memory, maps ram from 0 to 127
@@ -208,9 +226,14 @@ begin
 
     display1: led7seg_decoder port map ( input => std_logic_vector(resize(cpu0_ic, 4)), segments => HEX1);
 
-    display2: led7seg_decoder port map ( input => programmer_data_out(3 downto 0), segments => HEX2);
+    display2_mux <= programmer_data_out(3 downto 0) when io0_chip_select = '0' else
+                    io0_data_register(3 downto 0);
+    display3_mux <= programmer_data_out(7 downto 4) when io0_chip_select = '0' else
+                    io0_data_register(4 downto 7);
 
-    display3: led7seg_decoder port map ( input => programmer_data_out(7 downto 4), segments => HEX3);
+    display2: led7seg_decoder port map ( input => display2_mux, segments => HEX2);
+
+    display3: led7seg_decoder port map ( input => display3_mux, segments => HEX3);
 
     display4: led7seg_decoder port map ( input => programmer_data_in(3 downto 0), segments => HEX4);
 
