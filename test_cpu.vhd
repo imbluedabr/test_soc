@@ -94,9 +94,8 @@ architecture test_cpu_arch of test_cpu is
         19 => "00000001001", --select data_in, ld ir                = execute next instruction
         --0x03 STA adres
         24 => "00001110010", --select reg_ip, ld adres, inc ip, rd  = fetch operand
-        25 => "00000000000", 
-        26 => "00000010001", --select data_in, ld adres             = store operand
-        27 => "11000000100", --select reg_a, ld data_out, wr        = write data
+        25 => "01000000100", --select reg_a, ld data_out            = prefetch register
+        26 => "10000010001", --select data_in, ld adres, wr         = store operand
         others => (others => '0')
     );
 
