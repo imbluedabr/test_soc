@@ -81,6 +81,13 @@ architecture test_cpu_arch of test_cpu is
         0  => "01110010", --ld adres, inc ip, select reg_ip, rd
         1  => "00000000",
         2  => "00001001", --ld ir, select data_in
+        --0x01 JMP adres
+        8  => "01110010", --ld adres, inc ip, select reg_ip, rd
+        9  => "00000000",
+        10 => "10000001", --ld ip, select data_in
+        11 => "01110010", --ld adres, inc ip, select reg_ip, rd
+        12 => "00000000",
+        13 => "00001001", --ld ir, select data_in
         others => (others => '0')
     );
 
@@ -129,6 +136,10 @@ begin
                     read_enable <= '1';
                 else
                     read_enable <= '0';
+                end if;
+
+                if (control_signals(7) = '1') then --ld ip
+                    reg_ip <= internal_bus;
                 end if;
 
             end if;
