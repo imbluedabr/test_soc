@@ -208,7 +208,7 @@ begin
                 end if;
             end if;
         end if;
-    end process
+    end process;
 
     cpu0: test_cpu port map ( data_in => cpu0_data_in, data_out => cpu0_data_out, adres_out => cpu0_adres_out, read_enable => cpu0_read_enable, write_enable => cpu0_write_enable, reset => sys_reset, clock => sys_clk, chip_select => cpu0_chip_select, reg_ir => cpu0_ir, reg_ic => cpu0_ic );
 
