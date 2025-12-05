@@ -1,7 +1,6 @@
-
-LIBRARY ieee;                 -- this lib needed for STD_LOGIC
-USE ieee.std_logic_1164.all;  -- the package with this info
-USE ieee.numeric_std.all;     -- UNSIGNED
+library ieee;                 -- this lib needed for STD_LOGIC
+use ieee.std_logic_1164.all;  -- the package with this info
+use ieee.numeric_std.all;     -- UNSIGNED
 
 entity test_ram is
 
@@ -35,8 +34,6 @@ begin
 
                 if (read_enable = '1') then
                     data_out <= ram(to_integer(unsigned(adres_in)));
-                else
-                    data_out <= (others => '0');
                 end if;
             end if;
         end if;
@@ -45,9 +42,9 @@ begin
 end architecture test_ram_arch;
 
 
-LIBRARY ieee;                 -- this lib needed for STD_LOGIC
-USE ieee.std_logic_1164.all;  -- the package with this info
-USE ieee.numeric_std.all;     -- UNSIGNED
+library ieee;                 -- this lib needed for STD_LOGIC
+use ieee.std_logic_1164.all;  -- the package with this info
+use ieee.numeric_std.all;     -- UNSIGNED
 
 entity test_cpu is
 
@@ -76,27 +73,37 @@ architecture test_cpu_arch of test_cpu is
     signal reg_a : unsigned(7 downto 0);
     signal reg_b : unsigned(7 downto 0);
 
-    type microcode_rom_type is array (0 to 31) of std_logic_vector(7 downto 0);
+    type microcode_rom_type is array (0 to 31) of std_logic_vector(10 downto 0);
     
     constant microcode_rom : microcode_rom_type := (
         --0x00 NOP
-        0  => "01110010", --ld adres, inc ip, select reg_ip, rd
-        1  => "00000000",
-        2  => "00001001", --ld ir, select data_in
+        0  => "00001110010", --ld adres, inc ip, select reg_ip, rd
+        1  => "00000000000",
+        2  => "00000001001", --ld ir, select data_in
         --0x01 JMP adres
-        8  => "01110010", --ld adres, inc ip, select reg_ip, rd
-        9  => "00000000",
-        10 => "10000001", --ld ip, select data_in
-        11 => "01110010", --ld adres, inc ip, select reg_ip, rd
-        12 => "00000000",
-        13 => "00001001", --ld ir, select data_in
+        8  => "00001110010", --ld adres, inc ip, select reg_ip, rd
+        9  => "00000000000",
+        10 => "00010000001", --ld ip, select data_in
+        11 => "00001110010", --ld adres, inc ip, select reg_ip, rd
+        12 => "00000000000",
+        13 => "00000001001", --ld ir, select data_in
+        --0x02 LDA value
+        16 => "00001110010", --select reg_ip, ld adres, inc ip, rd  = fetch operand
+        17 => "00001110010", --select reg_ip, ld adres, inc ip, rd  = fetch next instr
+        18 => "00100000001", --select data_in, ld a                 = store operand
+        19 => "00000001001", --select data_in, ld ir                = execute next instruction
+        --0x03 STA adres
+        24 => "00001110010", --select reg_ip, ld adres, inc ip, rd  = fetch operand
+        25 => "00000000000", 
+        26 => "00000010001", --select data_in, ld adres             = store operand
+        27 => "11000000100", --select reg_a, ld data_out, wr        = write data
         others => (others => '0')
     );
 
 begin
 
     cycle: process (clock, reset, chip_select)
-        variable control_signals : std_logic_vector(7 downto 0) := (others => '0');
+        variable control_signals : std_logic_vector(10 downto 0) := (others => '0');
         variable internal_bus : unsigned(7 downto 0) := (others => '0');
     begin
         if (reset = '0') then
@@ -124,10 +131,8 @@ begin
                     reg_ic <= (others => '0');
                 end if;
 
-                if (control_signals(4) = '1') then --ld adres : sets the adres_out to the internal_bus
+                if (control_signals(4) = '1') then --ld adres : sets the adres_out buffer to the internal_bus
                     adres_out <= std_logic_vector(internal_bus);
-                else
-                    adres_out <= (others => '0');
                 end if;
 
                 if (control_signals(5) = '1') then --inc ip : increments the instruction pointer
@@ -144,6 +149,19 @@ begin
                     reg_ip <= internal_bus;
                 end if;
 
+                if (control_signals(8) = '1') then --ld a
+                    reg_a <= internal_bus;
+                end if;
+
+                if (control_signals(9) = '1') then --ld data_out
+                    data_out <= internal_bus;
+                end if;
+
+                if (control_signals(10) = '1') then --wr
+                    write_enable <= '1';
+                else
+                    write_enable <= '0';
+                end if;
             end if;
         end if;
     end process;
