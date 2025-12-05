@@ -35,6 +35,8 @@ begin
 
                 if (read_enable = '1') then
                     data_out <= ram(to_integer(unsigned(adres_in)));
+                else
+                    data_out <= (others => '0');
                 end if;
             end if;
         end if;
