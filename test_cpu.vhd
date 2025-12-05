@@ -154,7 +154,7 @@ begin
                 end if;
 
                 if (control_signals(9) = '1') then --ld data_out
-                    data_out <= internal_bus;
+                    data_out <= std_logic_vector(internal_bus);
                 end if;
 
                 if (control_signals(10) = '1') then --wr
