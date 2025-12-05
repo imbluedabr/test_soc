@@ -226,9 +226,9 @@ begin
 
     display1: led7seg_decoder port map ( input => std_logic_vector(resize(cpu0_ic, 4)), segments => HEX1);
 
-    display2_mux <= programmer_data_out(3 downto 0) when programmer_enable = '0' else
+    display2_mux <= programmer_data_out(3 downto 0) when programmer_enable = '1' else
                     io0_data_register(3 downto 0);
-    display3_mux <= programmer_data_out(7 downto 4) when programmer_enable = '0' else
+    display3_mux <= programmer_data_out(7 downto 4) when programmer_enable = '1' else
                     io0_data_register(7 downto 4);
 
     display2: led7seg_decoder port map ( input => display2_mux, segments => HEX2);
