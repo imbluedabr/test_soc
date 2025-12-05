@@ -198,7 +198,7 @@ begin
         end if;
     end process;
 
-    io0_chip_select <= '1' when sys_adres_in = "0000001" else '0';
+    io0_chip_select <= '1' when sys_adres_in = "10000000" else '0';
     io0: process (sys_clk)
     begin
         if rising_edge(sys_clk) then
@@ -226,10 +226,10 @@ begin
 
     display1: led7seg_decoder port map ( input => std_logic_vector(resize(cpu0_ic, 4)), segments => HEX1);
 
-    display2_mux <= programmer_data_out(3 downto 0) when io0_chip_select = '0' else
+    display2_mux <= programmer_data_out(3 downto 0) when programmer_enable = '0' else
                     io0_data_register(3 downto 0);
-    display3_mux <= programmer_data_out(7 downto 4) when io0_chip_select = '0' else
-                    io0_data_register(4 downto 7);
+    display3_mux <= programmer_data_out(7 downto 4) when programmer_enable = '0' else
+                    io0_data_register(7 downto 4);
 
     display2: led7seg_decoder port map ( input => display2_mux, segments => HEX2);
 
