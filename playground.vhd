@@ -231,7 +231,7 @@ begin
     display3_mux <= programmer_data_out(7 downto 4) when programmer_enable = '1' else
                     io0_data_register(7 downto 4);
 
-    display2: led7seg_decoder port map ( input => display2_mux, segments => HEX2);
+    display2: led7seg_decoder port map ( segments => HEX2, input => display2_mux );
 
     display3: led7seg_decoder port map ( input => display3_mux, segments => HEX3);
 

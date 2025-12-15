@@ -104,7 +104,7 @@ architecture test_cpu_arch of test_cpu is
 
 begin
 
-    cycle: process (clock, reset, chip_select)
+    cycle: process (clock, reset)
         variable control_signals : std_logic_vector(10 downto 0) := (others => '0');
         variable internal_bus : unsigned(7 downto 0) := (others => '0');
     begin
@@ -118,7 +118,7 @@ begin
                 control_signals := microcode_rom(to_integer((reg_ir sll 3) or reg_ic));
                 reg_ic <= reg_ic + 1; --increment the microinstruction counter
 
-                --this is horrible
+
                 case control_signals(2 downto 0) is
                     when "001" => internal_bus := unsigned(data_in);
                     when "010" => internal_bus := reg_ip;
@@ -141,11 +141,7 @@ begin
                     reg_ip <= reg_ip + 1;
                 end if;
 
-                if (control_signals(6) = '1') then --rd : enable read enable
-                    read_enable <= '1';
-                else
-                    read_enable <= '0';
-                end if;
+                read_enable <= control_signals(6); --rd
 
                 if (control_signals(7) = '1') then --ld ip
                     reg_ip <= internal_bus;
@@ -159,11 +155,8 @@ begin
                     data_out <= std_logic_vector(internal_bus);
                 end if;
 
-                if (control_signals(10) = '1') then --wr
-                    write_enable <= '1';
-                else
-                    write_enable <= '0';
-                end if;
+                write_enable <= control_signals(10); --wr
+
             end if;
         end if;
     end process;
