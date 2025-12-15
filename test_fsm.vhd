@@ -35,8 +35,10 @@ architecture arch of test_fsm is
     type state_t is array(0 to 65535) of std_logic_vector(19 downto 0);
     
     constant state_rom : state_t := (
-        
-        others => (others => '0');
+        0 => transition(1, 0, "1101"),
+        256 => transition(0, 1, "1110"),
+        257 => transition(0, 0, "1110"),
+        others => (others => '0')
     );
 
     signal current_state : std_logic_vector(7 downto 0) := (others => '0');
