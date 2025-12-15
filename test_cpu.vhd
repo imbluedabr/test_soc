@@ -44,7 +44,7 @@ end architecture test_ram_arch;
 
 library ieee;                 -- this lib needed for STD_LOGIC
 use ieee.std_logic_1164.all;  -- the package with this info
-use ieee.numeric_std.all;     -- UNSIGNED
+use ieee.numeric_std.all;     -- why is vhdl so shit
 
 entity test_cpu is
 
