@@ -16,7 +16,7 @@ end entity test_fsm;
 
 architecture arch of test_fsm is
 
-    function transition(state: integer; symbol: integer, ctrl: std_logic_vector(3 downto 0)) return std_logic_vector(19 downto 0) is
+    function transition(state: integer; symbol: integer; ctrl: std_logic_vector(3 downto 0)) return std_logic_vector(19 downto 0) is
         variable r : std_logic_vector(19 downto 0);
     begin
         r(7 downto 0) := std_logic_vector(to_unsigned(symbol, 8));
