@@ -120,7 +120,19 @@ architecture main_arch of main is
 
     end component test_ram;
 
+    component test_fsm is
+        port (
+            output : out std_logic_vector(7 downto 0);
+            input : in std_logic_vector(7 downto 0);
+            current_state : out std_logic_vector(7 downto 0);
+            clk : in std_logic;
+            reset : in std_logic
+        );
+
+    end component test_fsm;
+    
     signal sys_clk : std_logic;
+    /*
     signal sys_reset : std_logic;
     signal sys_data_in : std_logic_vector(7 downto 0);
     signal sys_adres_in : std_logic_vector(7 downto 0);
@@ -152,9 +164,17 @@ architecture main_arch of main is
 
     signal display2_mux : std_logic_vector(3 downto 0);
     signal display3_mux : std_logic_vector(3 downto 0);
-
+    */
+    
+    signal fsm0_state : std_logic_vector(7 downto 0) := (others => '0');
 begin
 
+    fsm0: test_fsm port map( output => LEDR(7 downto 0), input => SW(7 downto 0), current_state => fsm0_state, clk => sys_clk, reset => not KEY(0) );
+
+    disp0: led7seg_decoder port map ( input => fsm0_state(3 downto 0), segments => HEX0 );
+    disp1: led7seg_decoder port map ( input => fsm0_state(7 downto 4), segments => HEX1 );
+
+    /*
 
     --master output mux
     sys_data_in <= cpu0_data_out when cpu0_chip_select = '1' else
@@ -238,7 +258,7 @@ begin
     display4: led7seg_decoder port map ( input => programmer_data_in(3 downto 0), segments => HEX4);
 
     display5: led7seg_decoder port map ( input => programmer_data_in(7 downto 4), segments => HEX5);
-
+    */
 
     devider : PROCESS (MAX10_CLK1_50)
     
