@@ -43,9 +43,11 @@ architecture arch of test_fsm is
     type state_t is array(0 to 65535) of std_logic_vector(23 downto 0);
     
     constant state_rom : state_t := (
-        condition(0, 0) => transition(1, 0, sel_in or ldin),
-        condition(1, 0) => transition(0, 1, ldout or rst_in),
-        condition(1, 1) => transition(0, 0, ldout or rst_in),
+        condition(0, 0) => transition(1, 0, sel_in),
+        condition(1, 0) => transition(1, 1, ldout or ldin),
+        condition(1, 1) => transition(1, 2, ldout or ldin),
+        condition(1, 2) => transition(1, 3, ldout or ldin),
+        condition(1, 3) => transition(1, 0, ldout or ldin),
         others => (others => '0')
     );
 
@@ -86,8 +88,6 @@ begin
                 if (temp_state(19) = '1') then --set output symbol
                     output <= std_logic_vector(databus);
                 end if;
-
-                
 
             end if;
         end if;
