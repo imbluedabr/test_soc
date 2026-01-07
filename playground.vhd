@@ -168,7 +168,7 @@ architecture main_arch of main is
     signal cpu0_data_out : std_logic_vector(7 downto 0); --master to slave
     signal cpu0_bus_req : std_logic;
     signal cpu0_we : std_logic;
-    signal cpu0_rst : std_logic
+    signal cpu0_rst : std_logic;
 
     signal bram0_read : std_logic;
     signal bram0_write : std_logic;
@@ -180,7 +180,7 @@ architecture main_arch of main is
     signal btn_edge : std_logic;
 begin
 
-    bram0: test_ram port map(data_in => cpu0_data_out, data_out => cpu0_data_in, adres_in => cpu0_adres, read_enable => bram0_read, write_enable => bram0_write, chip_select => bram0_chip_select);
+    bram0: test_ram port map(data_in => cpu0_data_out, data_out => cpu0_data_in, adres_in => cpu0_adres(7 downto 0), read_enable => bram0_read, write_enable => bram0_write, chip_select => bram0_chip_select, clock => sys_clk);
 
    
 
@@ -191,29 +191,29 @@ begin
     bram0_read <= cpu0_bus_req and not cpu0_we;
     bram0_write <= cpu0_bus_req and cpu0_we;
     
-    LEDR <= address;
+    LEDR <= "00" & address(7 downto 0);
     
     input_test: process (KEY(0))
-
+	begin
         if falling_edge(KEY(0)) then
             if SW(9) = '1' then --set upper byte
                 input(15 downto 8) <= SW(7 downto 0);
             else --set lower byte
-                input(7 downto 0) <= SW(15 downto 8);
+                input(7 downto 0) <= SW(7 downto 0);
             end if;
         end if;
     end process;
 
-    btn_sync: process(MAX10_CLK1_50)
+    btn_debouncer: process(MAX10_CLK1_50)
     begin
         if rising_edge(MAX10_CLK1_50) then
-            btn_sync(0) <= button;
+            btn_sync(0) <= KEY(1);
             btn_sync(1) <= btn_sync(0);
         end if;
     end process;
 
     btn_edge <= btn_sync(0) and not btn_sync(1); --check the edge
-
+	/*
     clk_gate_inst : altclkctrl generic map (
         clock_type => "Global Clock",
         intended_device_family => "MAX 10"
@@ -224,7 +224,8 @@ begin
         inclk(3) => '0',
         ena => btn_edge,
         outclk => sys_clk
-    );
+    ); */
+	sys_clk <= MAX10_CLK1_50;
 
     /*
     devider : PROCESS (MAX10_CLK1_50)
