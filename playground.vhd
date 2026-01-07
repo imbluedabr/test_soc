@@ -150,6 +150,17 @@ architecture main_arch of main is
         );
     end component;
 
+    component test_fsm is
+        port (
+            output : out std_logic_vector(7 downto 0);
+            input : in std_logic_vector(7 downto 0);
+            current_state : out std_logic_vector(7 downto 0);
+            clk : in std_logic;
+            reset : in std_logic
+        );
+
+    end component test_fsm;
+    
     signal sys_clk : std_logic;
 
     signal cpu0_adres : std_logic_vector(15 downto 0); --master to slave
@@ -170,7 +181,8 @@ architecture main_arch of main is
 begin
 
     bram0: test_ram port map(data_in => cpu0_data_out, data_out => cpu0_data_in, adres_in => cpu0_adres, read_enable => bram0_read, write_enable => bram0_write, chip_select => bram0_chip_select);
-    
+
+   
 
     cpu0: SIMD_core port map(data_in => cpu0_data_in, data_out => cpu0_data_out, data_adres => cpu0_adres, program_in => input, program_adres => address, bus_req => cpu0_bus_req, we => cpu0_we, rst => cpu0_rst, clk => sys_clk);
     
@@ -213,7 +225,6 @@ begin
         ena => btn_edge,
         outclk => sys_clk
     );
-
 
     /*
     devider : PROCESS (MAX10_CLK1_50)
