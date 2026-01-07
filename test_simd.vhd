@@ -1,4 +1,7 @@
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity ALU is
 
@@ -40,6 +43,9 @@ begin
 
 end architecture ALU_impl;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity SIMD_core is
     generic (
@@ -113,14 +119,16 @@ architecture SIMD_core_impl of SIMD_core is
     signal control_signals : control_t;
     type cycle_state is (FE, EX, WB);
     signal cpu_state : cycle_state := FE;
-
+	attribute preserve : boolean; -- preserve the signal
+	attribute preserve of cpu_state : signal is true;
 begin
     
     --register file
-    reg_port1 <= r1 when reg_select1 = "00" and control_signals.en_alu = '1' else
-                 r2 when reg_select1 = "01" and control_signals.en_alu = '1'else
-                 r3 when reg_select1 = "10" and control_signals.en_alu = '1' else
-                 r4 when reg_select1 = "11" and control_signals.en_alu = '1' else
+    reg_port1 <= (others => '0') when control_signals.en_alu else
+				 r1 when reg_select1 = "00" else
+                 r2 when reg_select1 = "01" else
+                 r3 when reg_select1 = "10" else
+                 r4 when reg_select1 = "11" else
                  (others => '0');
     reg_port0 <= r1 when reg_select0 = "00" else
                  r2 when reg_select0 = "01" else
@@ -151,7 +159,7 @@ begin
     we <= control_signals.write;
 
     --control unit stuff
-    program_adres <= instruction_pointer;
+    program_adres <= std_logic_vector(instruction_pointer);
     opcode <= instruction_register(7 downto 0);
     operand <= instruction_register(15 downto 8);
 
