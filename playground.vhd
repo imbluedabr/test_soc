@@ -105,6 +105,25 @@ architecture main_arch of main is
             reg_ic : inout unsigned(2 downto 0)
         );
     end component test_cpu;
+    
+    component SIMD_core is
+        generic (
+            N : integer := 8
+        );
+
+        port (
+            data_in : in std_logic_vector(N-1 downto 0);
+            data_out : out std_logic_vector(N-1 downto 0);
+            data_adres : out std_logic_vector((2*N)-1 downto 0);
+            program_in : in std_logic_vector(N+7 downto 0);
+            program_adres : out std_logic_vector(N-1 downto 0);
+            bus_req : out std_logic;
+            we : out std_logic;
+            rst : in std_logic;
+            clk : in std_logic
+        );
+
+    end component SIMD_core;
 
     component test_ram is
 
@@ -119,127 +138,84 @@ architecture main_arch of main is
         );
 
     end component test_ram;
+    component altclkctrl 
+        generic (
+            clock_type : string := "Global Clock";
+            intended_device_family : string := "MAX 10"
+        );
+    
+        port (
+            inclk : in std_logic_vector(3 downto 0);
+            ena : in std_logic; outclk : out std_logic
+        );
+    end component;
 
     signal sys_clk : std_logic;
-    signal sys_reset : std_logic;
-    signal sys_data_in : std_logic_vector(7 downto 0);
-    signal sys_adres_in : std_logic_vector(7 downto 0);
-    signal sys_data_out : std_logic_vector(7 downto 0);
-    signal sys_read_enable : std_logic;
-    signal sys_write_enable : std_logic;
 
-    signal cpu0_data_in : std_logic_vector(7 downto 0);
-    signal cpu0_data_out : std_logic_vector(7 downto 0);
-    signal cpu0_adres_out : std_logic_vector(7 downto 0);
-    signal cpu0_read_enable : std_logic;
-    signal cpu0_write_enable : std_logic;
-    signal cpu0_chip_select : std_logic;
-    signal cpu0_ir : unsigned(4 downto 0);
-    signal cpu0_ic : unsigned(2 downto 0);
+    signal cpu0_adres : std_logic_vector(15 downto 0); --master to slave
+    signal cpu0_data_in : std_logic_vector(7 downto 0); --slave to master
+    signal cpu0_data_out : std_logic_vector(7 downto 0); --master to slave
+    signal cpu0_bus_req : std_logic;
+    signal cpu0_we : std_logic;
+    signal cpu0_rst : std_logic
 
-    signal programmer_data_in : std_logic_vector(7 downto 0);
-    signal programmer_data_out : std_logic_vector(7 downto 0);
-    signal programmer_adres_out : std_logic_vector(7 downto 0);
-    signal programmer_read_enable : std_logic;
-    signal programmer_write_enable : std_logic;
-    signal programmer_enable : std_logic;
+    signal bram0_read : std_logic;
+    signal bram0_write : std_logic;
+    signal bram0_chip_select : std_logic;
 
-    signal mem0_data_out : std_logic_vector(7 downto 0);
-    signal mem0_chip_select : std_logic;
-
-    signal io0_data_register : std_logic_vector(7 downto 0);
-    signal io0_chip_select : std_logic;
-
-    signal display2_mux : std_logic_vector(3 downto 0);
-    signal display3_mux : std_logic_vector(3 downto 0);
-
+    signal input : std_logic_vector(15 downto 0);
+    signal address : std_logic_vector(7 downto 0);
+    signal btn_sync : std_logic_vector(1 downto 0);
+    signal btn_edge : std_logic;
 begin
 
-
-    --master output mux
-    sys_data_in <= cpu0_data_out when cpu0_chip_select = '1' else
-                    programmer_data_out;
-    --slave output mux
-    sys_data_out <= mem0_data_out when mem0_chip_select = '1' else (others => '0');
-    --slave input mux
-    sys_adres_in <= cpu0_adres_out when cpu0_chip_select = '1' else
-                    programmer_adres_out;
-    sys_read_enable <= cpu0_read_enable when cpu0_chip_select = '1' else
-                    programmer_read_enable;
-    sys_write_enable <= cpu0_write_enable when cpu0_chip_select = '1' else
-                    programmer_write_enable;
-
-    --master input mux
-    programmer_data_in <= sys_data_out when programmer_enable = '1' else (others => '0');
-    cpu0_data_in <= sys_data_out when cpu0_chip_select = '1' else (others => '0');
-
-    --bus arbitration logic
-    programmer_enable <= SW(9);
-    cpu0_chip_select <= not programmer_enable;
+    bram0: test_ram port map(data_in => cpu0_data_out, data_out => cpu0_data_in, adres_in => cpu0_adres, read_enable => bram0_read, write_enable => bram0_write, chip_select => bram0_chip_select);
     
-    sys_reset <= KEY(0);
+
+    cpu0: SIMD_core port map(data_in => cpu0_data_in, data_out => cpu0_data_out, data_adres => cpu0_adres, program_in => input, program_adres => address, bus_req => cpu0_bus_req, we => cpu0_we, rst => cpu0_rst, clk => sys_clk);
     
-    programmer: process (sys_clk, SW(8), KEY(1))
-    begin
-        if rising_edge(sys_clk) then
-            if (SW(8) = '1') then
-                programmer_data_out <= SW(7 downto 0);
-            else
-                programmer_adres_out <= SW(7 downto 0);
-            end if;
-            
-            if (KEY(1) = '0') then --keys use active low logic(pull up resistors)
-                programmer_write_enable <= '1';
-                programmer_read_enable <= '0';
-            else
-                programmer_read_enable <= '1';
-                programmer_write_enable <= '0';
+
+    bram0_chip_select <= '1';
+    bram0_read <= cpu0_bus_req and not cpu0_we;
+    bram0_write <= cpu0_bus_req and cpu0_we;
+    
+    LEDR <= address;
+    
+    input_test: process (KEY(0))
+
+        if falling_edge(KEY(0)) then
+            if SW(9) = '1' then --set upper byte
+                input(15 downto 8) <= SW(7 downto 0);
+            else --set lower byte
+                input(7 downto 0) <= SW(15 downto 8);
             end if;
         end if;
     end process;
 
-    io0_chip_select <= '1' when sys_adres_in = "10000000" else '0';
-    io0: process (sys_clk)
+    btn_sync: process(MAX10_CLK1_50)
     begin
-        if rising_edge(sys_clk) then
-            if (io0_chip_select = '1') then
-                if (sys_write_enable = '1') then
-                    io0_data_register <= sys_data_in;
-                end if;
-            end if;
+        if rising_edge(MAX10_CLK1_50) then
+            btn_sync(0) <= button;
+            btn_sync(1) <= btn_sync(0);
         end if;
     end process;
 
-    cpu0: test_cpu port map ( data_in => cpu0_data_in, data_out => cpu0_data_out, adres_out => cpu0_adres_out, read_enable => cpu0_read_enable, write_enable => cpu0_write_enable, reset => sys_reset, clock => sys_clk, chip_select => cpu0_chip_select, reg_ir => cpu0_ir, reg_ic => cpu0_ic );
+    btn_edge <= btn_sync(0) and not btn_sync(1); --check the edge
 
-    --chip select logic for memory, maps ram from 0 to 127
-    mem0_chip_select <= '1' when sys_adres_in(7) = '0' else '0';
-    mem0: test_ram port map ( data_in => sys_data_in, data_out => mem0_data_out, adres_in => sys_adres_in, read_enable => sys_read_enable, write_enable => sys_write_enable, clock => sys_clk, chip_select => mem0_chip_select);
-
-    
-
-    LEDR(9) <= sys_clk;
-    LEDR(8) <= sys_read_enable;
-    LEDR(7 downto 0) <= sys_adres_in;
-
-    display0: led7seg_decoder port map ( input => std_logic_vector(cpu0_ir(3 downto 0)), segments => HEX0);
-
-    display1: led7seg_decoder port map ( input => std_logic_vector(resize(cpu0_ic, 4)), segments => HEX1);
-
-    display2_mux <= programmer_data_out(3 downto 0) when programmer_enable = '1' else
-                    io0_data_register(3 downto 0);
-    display3_mux <= programmer_data_out(7 downto 4) when programmer_enable = '1' else
-                    io0_data_register(7 downto 4);
-
-    display2: led7seg_decoder port map ( segments => HEX2, input => display2_mux );
-
-    display3: led7seg_decoder port map ( input => display3_mux, segments => HEX3);
-
-    display4: led7seg_decoder port map ( input => programmer_data_in(3 downto 0), segments => HEX4);
-
-    display5: led7seg_decoder port map ( input => programmer_data_in(7 downto 4), segments => HEX5);
+    clk_gate_inst : altclkctrl generic map (
+        clock_type => "Global Clock",
+        intended_device_family => "MAX 10"
+    ) port map (
+        inclk(0) => MAX10_CLK1_50,
+        inclk(1) => '0',
+        inclk(2) => '0',
+        inclk(3) => '0',
+        ena => btn_edge,
+        outclk => sys_clk
+    );
 
 
+    /*
     devider : PROCESS (MAX10_CLK1_50)
     
         --! integer for counting delimited to 64 there for 6 lines on vector.
@@ -260,7 +236,7 @@ begin
         END IF;                                   -- put result of counter on signal
     END PROCESS;
 
-   
+   */
 
 end architecture main_arch;
 
