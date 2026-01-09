@@ -37,7 +37,7 @@ begin
     add_res <= ('0' & unsigned(operand_a)) + b_unsigned + carry_in;
 
     result <= std_logic_vector(add_res(N-1 downto 0)) when enable = '1' else
-              operand_a;
+              operand_b;
     
     flags_out(0) <= '1' when add_res(N-1 downto 0) = to_unsigned(0, N) else
                     '0';
@@ -62,8 +62,9 @@ entity SIMD_core is
         program_adres : out std_logic_vector(N-1 downto 0);
         bus_req : out std_logic;
         we : out std_logic;
-        rst : in std_logic;
-        clk : in std_logic
+        reset : in std_logic;
+        clk : in std_logic;
+		debug_port : out std_logic_vector(N-1 downto 0)
     );
 
 end entity SIMD_core;
@@ -121,9 +122,11 @@ architecture SIMD_core_impl of SIMD_core is
     end record;
     signal control_signals : control_t;
     type cycle_state is (FE, EX, WB);
-    signal cpu_state : cycle_state := FE;
+    signal cpu_state : cycle_state := WB;
 	attribute preserve : boolean; -- preserve the signal
 	attribute preserve of cpu_state : signal is true;
+	attribute keep : boolean;
+	attribute keep of bus_req : signal is true;
 begin
     
     --register file
@@ -138,6 +141,8 @@ begin
                  r4 when reg_select0 = "11" else
                  (others => '0');
     
+	debug_port <= reg_input;
+	
     reg_select0 <= opcode(5 downto 4);
     reg_select1 <= opcode(7 downto 6);
 
@@ -198,20 +203,29 @@ begin
                 control_signals.sel_alu_inp <= "01";
                 control_signals.sel_reg_inp <= '1';
                 control_signals.alu_mode <= "01";
-            when "0010" => --add reg, reg
+            when "0010" => --sub reg, reg
                 control_signals.set_reg <= '1';
                 control_signals.en_alu <= '1';
                 control_signals.sel_alu_inp <= "01";
                 control_signals.sel_reg_inp <= '1';
                 control_signals.alu_mode <= "10";
-            when "0011" => --add reg, reg
+            when "0011" => --subc reg, reg
                 control_signals.set_reg <= '1';
                 control_signals.en_alu <= '1';
                 control_signals.sel_alu_inp <= "01";
                 control_signals.sel_reg_inp <= '1';
                 control_signals.alu_mode <= "11";
-            when "0100" => --jmp operand
-                control_signals.set_ip <= '1';
+			when "0100" => --cmp reg, immediate
+				control_signals.en_alu <= '1';
+				control_signals.sel_alu_inp <= "11";
+				control_signals.alu_mode <= "10";
+			when "0101" => --cmp reg, reg
+				control_signals.en_alu <= '1';
+				control_signals.sel_alu_inp <= "01";
+				control_signals.alu_mode <= "10";
+			--when "0110" => --mul_lo
+			--when "0111" => --mul_hi
+			--when "1000" => --shr
             when "1001" => --ld reg, reg(operand)
                 control_signals.set_reg <= '1';
                 control_signals.en_alu <= '1';
@@ -233,53 +247,61 @@ begin
                 control_signals.sel_alu_inp <= "11";
                 control_signals.busrq <= '1';
                 control_signals.write <= '1';
+            when "1101" => --jmp operand
+                control_signals.set_ip <= '1';
+			--when "1110" => --umsk
+			--when "1111" => --msk immediate
             when others =>
                 null;
         end case;
     end process;
 
-    control_unit: process (clk, rst)
+    control_unit: process (clk, reset)
     begin
-        if rst = '1' then
-            instruction_pointer <= (others => '0');
-            instruction_register <= (others => '0');
+		
+        if rising_edge(clk) then
+			if reset = '1' then
+				cpu_state <= WB;
+				
+				instruction_pointer <= (others => '0');
+				instruction_register <= (others => '0');
+				r1 <= (others => '0');
+				r2 <= (others => '0');
+				r3 <= (others => '0');
+				r4 <= (others => '0');
+			else
+				if cpu_state = FE then --fetch instruction
+				
+					instruction_register <= program_in;
+					instruction_pointer <= instruction_pointer + 1;
+					
+					cpu_state <= EX;
 
-            r1 <= (others => '0');
-            r2 <= (others => '0');
-            r3 <= (others => '0');
-            r4 <= (others => '0');
+				end if;
 
-            cpu_state <= FE;
-        elsif rising_edge(clk) then
-            if cpu_state = FE then --fetch instruction
-                instruction_register <= program_in;
-                instruction_pointer <= instruction_pointer + 1;
-                cpu_state <= EX;
-            end if;
+				if cpu_state = EX then --execute instruction
+					alu0_flags <= alu0_newflags;
+					cpu_state <= WB;
+				end if;
 
-            if cpu_state = EX then --execute instruction
-                alu0_flags <= alu0_newflags;
-                cpu_state <= WB;
-            end if;
+				
+				if cpu_state = WB then
+					if control_signals.set_reg = '1' then
+						case reg_select0 is
+							when "00" => r1 <= reg_input;
+							when "01" => r2 <= reg_input;
+							when "10" => r3 <= reg_input;
+							when "11" => r4 <= reg_input;
+						end case;
+					end if;
 
-            
-            if cpu_state = WB then
-                if control_signals.set_reg = '1' then
-                    case reg_select0 is
-                        when "00" => r1 <= reg_input;
-                        when "01" => r2 <= reg_input;
-                        when "10" => r3 <= reg_input;
-                        when "11" => r4 <= reg_input;
-                    end case;
-                end if;
-
-                if control_signals.set_ip = '1' then
-                    instruction_pointer <= operand;
-                end if;
-                
-                cpu_state <= FE;
-            end if;
-
+					if control_signals.set_ip = '1' then
+						instruction_pointer <= unsigned(operand);
+					end if;
+					
+					cpu_state <= FE;
+				end if;
+			end if;
         end if;
     end process;
 
