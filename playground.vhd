@@ -119,8 +119,9 @@ architecture main_arch of main is
             program_adres : out std_logic_vector(N-1 downto 0);
             bus_req : out std_logic;
             we : out std_logic;
-            rst : in std_logic;
-            clk : in std_logic
+            reset : in std_logic;
+            clk : in std_logic;
+			debug_port : out std_logic_vector(N-1 downto 0)
         );
 
     end component SIMD_core;
@@ -166,6 +167,7 @@ architecture main_arch of main is
     signal cpu0_adres : std_logic_vector(15 downto 0); --master to slave
     signal cpu0_data_in : std_logic_vector(7 downto 0); --slave to master
     signal cpu0_data_out : std_logic_vector(7 downto 0); --master to slave
+	signal cpu0_program_adres : std_logic_vector(7 downto 0);
     signal cpu0_bus_req : std_logic;
     signal cpu0_we : std_logic;
     signal cpu0_rst : std_logic;
@@ -174,36 +176,94 @@ architecture main_arch of main is
     signal bram0_write : std_logic;
     signal bram0_chip_select : std_logic;
 
-    signal input : std_logic_vector(15 downto 0);
-    signal address : std_logic_vector(7 downto 0);
-    signal btn_sync : std_logic_vector(1 downto 0);
-    signal btn_edge : std_logic;
+	signal gpio_port_we : std_logic;
+	signal gpio_value : std_logic_vector(7 downto 0) := (others => '0');
+	
+	signal rom0_program_out : std_logic_vector(15 downto 0);
+	type rom_type is array (0 to  255) of std_logic_vector(15 downto 0);
+    
+	function asm(opc: integer; reg0: integer; reg1: integer; imm: integer) return std_logic_vector is
+		variable r: unsigned(15 downto 0);
+	begin
+		r := to_unsigned(imm, 8) & to_unsigned(reg1, 2) & to_unsigned(reg0, 2) & to_unsigned(opc, 4);
+		return std_logic_vector(r);
+	end function;
+	
+	constant rom : rom_type := (
+		0 => asm(10, 0, 0, 1),
+		1 => "0000000100111010",
+		2 => "0000000010001100",
+		others => (others => '0')
+	);
+	attribute keep : boolean;
+	attribute keep of rom0_program_out : signal is true;
+	
+	signal debug_signal : std_logic_vector(7 downto 0);
 begin
 
-    bram0: test_ram port map(data_in => cpu0_data_out, data_out => cpu0_data_in, adres_in => cpu0_adres(7 downto 0), read_enable => bram0_read, write_enable => bram0_write, chip_select => bram0_chip_select, clock => sys_clk);
 
-   
-
-    cpu0: SIMD_core port map(data_in => cpu0_data_in, data_out => cpu0_data_out, data_adres => cpu0_adres, program_in => input, program_adres => address, bus_req => cpu0_bus_req, we => cpu0_we, rst => cpu0_rst, clk => sys_clk);
+    cpu0: SIMD_core port map(
+		data_in => cpu0_data_in,
+		data_out => cpu0_data_out,
+		data_adres => cpu0_adres,
+		program_in => rom0_program_out,
+		program_adres => cpu0_program_adres,
+		bus_req => cpu0_bus_req, we => cpu0_we,
+		reset => cpu0_rst,
+		clk => sys_clk,
+		debug_port => debug_signal
+	);
     
 
-    bram0_chip_select <= '1';
+    bram0_chip_select <= '1' when cpu0_adres(15 downto 8) = "00000000" else
+						 '0';
     bram0_read <= cpu0_bus_req and not cpu0_we;
     bram0_write <= cpu0_bus_req and cpu0_we;
-    
-    LEDR <= "00" & address(7 downto 0);
-    
-    input_test: process (KEY(0))
-	begin
-        if falling_edge(KEY(0)) then
-            if SW(9) = '1' then --set upper byte
-                input(15 downto 8) <= SW(7 downto 0);
-            else --set lower byte
-                input(7 downto 0) <= SW(7 downto 0);
-            end if;
-        end if;
-    end process;
+	bram0: test_ram port map(
+		data_in => cpu0_data_out,
+		data_out => cpu0_data_in,
+		adres_in => cpu0_adres(7 downto 0),
+		read_enable => bram0_read,
+		write_enable => bram0_write,
+		chip_select => bram0_chip_select,
+		clock => sys_clk
+	);
 
+	
+	gpio_port_we <= '1' when cpu0_adres = "0000000100000000" and cpu0_bus_req = '1' and cpu0_we = '1' else
+					'0';
+	
+	gpio_port: process (sys_clk)
+	begin
+		if rising_edge(sys_clk) and gpio_port_we = '1' then
+			gpio_value <= cpu0_data_out;
+		end if;
+	end process;
+	
+	rom0: process (sys_clk)
+	begin
+		if rising_edge(sys_clk) then
+			rom0_program_out <= rom(to_integer(unsigned(cpu0_program_adres)));
+		end if;
+	end process;
+	
+	out0: led7seg_decoder port map(input => gpio_value(3 downto 0), segments => HEX4);
+    out1: led7seg_decoder port map(input => gpio_value(7 downto 4), segments => HEX5);
+    
+	adr0: led7seg_decoder port map(input => cpu0_program_adres(3 downto 0), segments => HEX0);
+	adr1: led7seg_decoder port map(input => cpu0_program_adres(7 downto 4), segments => HEX1);
+	--dbg0: led7seg_decoder port map(input => debug_signal(3 downto 0), segments => HEX0);
+	--dbg1: led7seg_decoder port map(input => debug_signal(7 downto 4), segments => HEX1);
+	dadr0: led7seg_decoder port map(input => cpu0_adres(11 downto 8), segments => HEX2);
+	dadr1: led7seg_decoder port map(input => cpu0_adres(15 downto 12), segments => HEX3);
+	LEDR(7 downto 0) <= cpu0_adres(7 downto 0);
+    LEDR(8) <= cpu0_bus_req;
+	LEDR(9) <= gpio_port_we;
+	
+    
+	
+	
+	/*
     btn_debouncer: process(MAX10_CLK1_50)
     begin
         if rising_edge(MAX10_CLK1_50) then
@@ -213,7 +273,13 @@ begin
     end process;
 
     btn_edge <= btn_sync(0) and not btn_sync(1); --check the edge
-	/*
+	
+	
+	disp0: led7seg_decoder port map(input => input(3 downto 0), segments => HEX0);
+	disp1: led7seg_decoder port map(input => input(7 downto 4), segments => HEX1);
+	disp2: led7seg_decoder port map(input => input(11 downto 8), segments => HEX2);
+	disp3: led7seg_decoder port map(input => input(15 downto 12), segments => HEX3);
+	
     clk_gate_inst : altclkctrl generic map (
         clock_type => "Global Clock",
         intended_device_family => "MAX 10"
@@ -224,10 +290,11 @@ begin
         inclk(3) => '0',
         ena => btn_edge,
         outclk => sys_clk
-    ); */
-	sys_clk <= MAX10_CLK1_50;
-
-    /*
+    );*/
+	cpu0_rst <= not KEY(0);
+	--sys_clk <= MAX10_CLK1_50;
+	
+    
     devider : PROCESS (MAX10_CLK1_50)
     
         --! integer for counting delimited to 64 there for 6 lines on vector.
@@ -248,7 +315,7 @@ begin
         END IF;                                   -- put result of counter on signal
     END PROCESS;
 
-   */
+   
 
 end architecture main_arch;
 
